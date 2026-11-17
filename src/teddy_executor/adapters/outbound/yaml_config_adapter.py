@@ -188,7 +188,6 @@ class YamlConfigAdapter(IConfigService):
     def _env_file_path(self) -> str:
         """Returns the path to the ``.env`` file inside the config directory."""
         return os.path.join(os.path.dirname(self._config_path), ".env")
-
     def set_env_variable(self, name: str, value: str) -> None:
         """Persists a secret to the ``.env`` file WITHOUT mutating ``os.environ``.
 
@@ -201,6 +200,24 @@ class YamlConfigAdapter(IConfigService):
         if parent_dir:
             os.makedirs(parent_dir, exist_ok=True)
         set_key(env_path, name, value, quote_mode="always")
+
+    def get_agent_model(self, agent_name: str) -> str:
+        """
+        Returns the LLM model name for the specified agent persona.
+        """
+        agent_model = self.get_setting(f"agents.{agent_name}.model")
+        if agent_model:
+            return agent_model
+        return self.get_setting("llm.model", "")
+
+    def get_agent_api_key(self, agent_name: str) -> str:
+        """
+        Returns the API key for the specified agent persona.
+        """
+        agent_api_key = self.get_setting(f"agents.{agent_name}.api_key")
+        if agent_api_key:
+            return agent_api_key
+        return self.get_setting("llm.api_key", "")
 
     def _build_interpolation_env(self) -> Dict[str, str]:
         """Build the lookup table used to resolve ``${VAR}`` tokens.

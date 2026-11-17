@@ -53,3 +53,17 @@ class IConfigService(ABC):
             value: The secret value to persist.
         """
         pass
+
+    @abstractmethod
+    def get_agent_model(self, agent_name: str) -> str:
+        """
+        Returns the LLM model name for the specified agent persona.
+        """
+        pass
+
+    @abstractmethod
+    def get_agent_api_key(self, agent_name: str) -> str:
+        """
+        Returns the API key for the specified agent persona.
+        """
+        pass

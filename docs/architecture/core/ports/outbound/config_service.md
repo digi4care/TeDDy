@@ -56,3 +56,15 @@ None — this is an outbound (driven) port.
 - **Postconditions:** Persists the secret to the `.env` file in the config directory and leaves `os.environ` untouched.
 - **Exceptions:**
   - `OSError`: Target `.env` file is unwritable.
+
+### `get_agent_model(agent_name) -> str`
+- **Preconditions:** `agent_name` is a non-empty string identifying an agent persona.
+- **Postconditions:** Returns the LLM model name for the specified agent persona.
+- **Resolution:** Returns `agents.<agent_name>.model` if present, else `llm.model`. Returns empty string if neither is set.
+- **Exceptions:** None — the contract guarantees a return value.
+
+### `get_agent_api_key(agent_name) -> str`
+- **Preconditions:** `agent_name` is a non-empty string identifying an agent persona.
+- **Postconditions:** Returns the API key for the specified agent persona.
+- **Resolution:** Returns `agents.<agent_name>.api_key` if present, else `llm.api_key`. Returns empty string if neither is set.
+- **Exceptions:** None — the contract guarantees a return value.
