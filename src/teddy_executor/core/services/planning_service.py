@@ -80,7 +80,7 @@ class PlanningService(IPlanningUseCase):
             cache_dir=str(Path(turn_dir).parent),
         )
 
-        # Context is purely project state (including initial_request.md via session.context).
+        # Session history stays in context; the active instruction is delivered last.
         full_context = f"{context.header}\n{context.content}"
         messages = [
             {"role": "system", "content": system_prompt},
@@ -89,6 +89,8 @@ class PlanningService(IPlanningUseCase):
                 "content": full_context,
             },
         ]
+        if resolved_message:
+            messages.append({"role": "user", "content": resolved_message})
 
         self._file_system_manager.write_file(
             (turn_path / "input.md").as_posix(), full_context

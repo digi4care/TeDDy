@@ -3,7 +3,7 @@
 - **Source:** [`src/teddy_executor/core/services/planning_service.py`](/src/teddy_executor/core/services/planning_service.py)
 
 ## Purpose
-Implements the `IPlanningUseCase` inbound port. It gathers project context, resolves the agent system prompt, calls the LLM, and persists the generated plan to the turn directory, following a pure context model with no injected instructions.
+Implements the `IPlanningUseCase` inbound port. It gathers project context, resolves the agent system prompt, delivers the active instruction separately from session history, calls the LLM, and persists the generated plan to the turn directory.
 
 ## Consumers
 - [`SessionPlanner`](./session_planner.md): Calls `generate_plan` to start a turn's planning phase.
@@ -21,7 +21,7 @@ Implements the `IPlanningUseCase` inbound port. It gathers project context, reso
 - [`ISessionManager`](../ports/outbound/session_manager.md): Resolves session and turn context manifests.
 
 ## Class Invariants
-- `pure_context_model`: The service never injects user instructions into the LLM `messages` or `input.md`.
+- `context_instruction_separation`: The first user message and `input.md` contain only project and session context. A non-empty resolved human reply or replan feedback is appended as a distinct final user message; an empty continuation adds no message.
 - `single_gather_per_turn`: Project context is gathered exactly once and threaded to the caller.
 - `retry_on_empty`: An empty LLM response is retried up to `llm.max_retries` times.
 - `cost_accumulation`: Every billed attempt accumulates into the turn cost.
@@ -55,7 +55,7 @@ None declared directly — the service consumes the ports bundled in `PlanningPo
   - `KeyboardInterrupt`: User quits while the planning wait is pending.
 
 ### `_run_planning_phase(messages, model, meta) -> tuple[Any, int, str, float]`
-- **Preconditions:** `messages` holds the assembled system and context messages; `model` is the resolved model; `meta` carries the turn telemetry.
+- **Preconditions:** `messages` holds the assembled system and context messages, followed by the active instruction when one is resolved; `model` is the resolved model; `meta` carries the turn telemetry.
 - **Postconditions:** Hydrates through `get_context_window`, counts tokens, displays telemetry, checks the context budget, and performs the generation with retry, all on a daemon worker. Returns the response, the token count, the plan content, and the turn cost.
 - **Exceptions:**
   - `ConfigurationError`: Assembled request token count exceeds the context window.

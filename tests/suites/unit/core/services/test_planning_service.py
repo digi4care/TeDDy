@@ -17,6 +17,7 @@ from teddy_executor.core.ports.outbound import (
 )
 from teddy_executor.core.ports.outbound.prompt_manager import IPromptManager
 from teddy_executor.core.services.planning_service import PlanningService
+from teddy_executor.core.services.session_replanner import SessionReplanner
 from teddy_executor.core.utils.interrupt_guard import raise_interrupt
 from tests.harness.setup.mocking import POSIXPathMock
 
@@ -72,9 +73,104 @@ def test_generate_plan_delegates_to_llm_client(env):
     assert "messages" in kwargs
     messages = kwargs["messages"]
     assert messages[0]["content"] == "system-prompt"
-    # Pure context strategy: user message is context only
-    assert messages[1]["content"] == "H\nC"
+    # The first user message remains project and session context only.
+    assert messages[1] == {"role": "user", "content": "H\nC"}
     assert "model" in kwargs  # Now explicitly passed for override support
+
+
+def test_approval_reply_is_distinct_final_user_message(env):
+    mock_prompt_manager = env.mock_port(IPromptManager)
+    mock_llm_client = env.mock_port(ILlmClient)
+    mock_context_service = env.mock_port(IGetContextUseCase)
+    mock_fs = env.mock_port(IFileSystemManager)
+    service = env.get_service(PlanningService)
+
+    metadata = {}
+    context = ProjectContext(
+        header="# Project Context",
+        content=(
+            "## Session History\n### Turn 01 Report\nAgent MESSAGE: May I proceed?"
+        ),
+        scoped_paths={},
+        git_status="",
+    )
+    mock_prompt_manager.resolve_message.return_value = "yes"
+    mock_prompt_manager.resolve_agent_metadata.return_value = (
+        "developer",
+        metadata,
+        "session/02/meta.yaml",
+    )
+    mock_prompt_manager.fetch_system_prompt.return_value = "system-prompt"
+    mock_context_service.get_context.return_value = context
+
+    service.generate_plan(user_message="yes", turn_dir="session/02", context_files={})
+
+    messages = mock_llm_client.get_completion.call_args.kwargs["messages"]
+    context_payload = f"{context.header}\n{context.content}"
+    assert [message["role"] for message in messages] == ["system", "user", "user"]
+    assert messages[1] == {"role": "user", "content": context_payload}
+    assert messages[-1] == {"role": "user", "content": "yes"}
+    assert metadata["user_request"] == "yes"
+
+    input_call = mock_fs.find_call_by_path("write_file", "session/02/input.md")
+    assert input_call.args[1] == context_payload
+
+
+def test_malformed_replan_feedback_is_distinct_final_user_message(env):
+    mock_prompt_manager = env.mock_port(IPromptManager)
+    mock_llm_client = env.mock_port(ILlmClient)
+    mock_context_service = env.mock_port(IGetContextUseCase)
+    mock_fs = env.mock_port(IFileSystemManager)
+    service = env.get_service(PlanningService)
+    replanner = SessionReplanner(mock_fs, service)
+
+    metadata = {
+        "is_replan": True,
+        "user_request": "Original human request",
+    }
+    mock_prompt_manager.resolve_message.side_effect = lambda message, _turn_path: (
+        message
+    )
+    mock_prompt_manager.resolve_agent_metadata.return_value = (
+        "developer",
+        metadata,
+        "session/03/meta.yaml",
+    )
+    mock_prompt_manager.fetch_system_prompt.return_value = "system-prompt"
+    context = ProjectContext(
+        header="# Project Context",
+        content="## Session History\n### Turn 02 Plan\nMalformed response",
+        scoped_paths={},
+        git_status="",
+    )
+    mock_context_service.get_context.return_value = context
+
+    validation_error = (
+        "Response must contain exactly one Level 1 heading and exactly one of "
+        "## Action Plan or ## Message."
+    )
+    malformed_response = "This is the same malformed response as before."
+    validation_ast = "# Faulty AST view"
+    replanner.trigger_replan_turn(
+        next_turn_dir="session/03",
+        errors=[validation_error],
+        original_content=malformed_response,
+        validation_ast=validation_ast,
+    )
+
+    messages = mock_llm_client.get_completion.call_args.kwargs["messages"]
+    assert [message["role"] for message in messages] == ["system", "user", "user"]
+    assert messages[1] == {
+        "role": "user",
+        "content": f"{context.header}\n{context.content}",
+    }
+    feedback = messages[-1]["content"]
+    assert feedback.startswith("The previous plan failed validation.")
+    assert validation_error in feedback
+    assert validation_ast in feedback
+    assert "## Original Faulty Plan:" in feedback
+    assert malformed_response in feedback
+    assert metadata["user_request"] == "Original human request"
 
 
 def test_generate_plan_returns_plan_path_cost_and_project_context(env):

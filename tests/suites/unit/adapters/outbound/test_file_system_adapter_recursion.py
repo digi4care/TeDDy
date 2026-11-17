@@ -1,21 +1,28 @@
+import pathspec
+
+from teddy_executor.adapters.outbound import filesystem_helpers
 from teddy_executor.adapters.outbound.local_file_system_adapter import (
     LocalFileSystemAdapter,
 )
+from teddy_executor.core.services.edit_simulator import EditSimulator
+
+# Load lazy dependencies during collection, before pyfakefs hides real source files.
+_PRELOADED_FILESYSTEM_MODULES = (pathspec, filesystem_helpers)
 
 
-def test_list_directory_recursive_finds_nested_files(fs, mock_edit_simulator):
+def build_adapter() -> LocalFileSystemAdapter:
+    return LocalFileSystemAdapter(edit_simulator=EditSimulator(), root_dir="/app")
+
+
+def test_list_directory_recursive_finds_nested_files(fs):
     # Arrange
     # fs is the pyfakefs fixture
     fs.create_file("/app/src/main.py", contents="print('hello')")
     fs.create_file("/app/src/utils/helpers.py", contents="def help(): pass")
     fs.create_file("/app/docs/readme.md", contents="# Readme")
 
-    adapter = LocalFileSystemAdapter(
-        edit_simulator=mock_edit_simulator, root_dir="/app"
-    )
-
     # Act
-    files = adapter.list_directory_recursive("src")
+    files = build_adapter().list_directory_recursive("src")
 
     # Assert
     # Paths should be relative to the root_dir (standard for this adapter's output)
@@ -25,7 +32,7 @@ def test_list_directory_recursive_finds_nested_files(fs, mock_edit_simulator):
     assert sorted(files) == sorted(expected)
 
 
-def test_list_directory_recursive_respects_ignores(fs, mock_edit_simulator):
+def test_list_directory_recursive_respects_ignores(fs):
     # Arrange
     fs.create_file("/app/.gitignore", contents="*.log\nnode_modules/")
     fs.create_file("/app/src/main.py", contents="print('hello')")
@@ -34,12 +41,8 @@ def test_list_directory_recursive_respects_ignores(fs, mock_edit_simulator):
     fs.create_file("/app/.teddyignore", contents="secret.txt")
     fs.create_file("/app/secret.txt", contents="shhh")
 
-    adapter = LocalFileSystemAdapter(
-        edit_simulator=mock_edit_simulator, root_dir="/app"
-    )
-
     # Act
-    files = adapter.list_directory_recursive(".")
+    files = build_adapter().list_directory_recursive(".")
 
     # Assert
     # .gitignore, .teddyignore, and ignored files/dirs should be excluded
@@ -52,7 +55,7 @@ def test_list_directory_recursive_respects_ignores(fs, mock_edit_simulator):
     assert "src/main.py" in files
 
 
-def test_list_directory_recursive_dot_resolves_correctly(fs, mock_edit_simulator):
+def test_list_directory_recursive_dot_resolves_correctly(fs):
     """
     Regression test for Bug #26: list_directory_recursive(".") must not raise
     FileNotFoundError when root_dir points to a path that exists only in pyfakefs.
@@ -65,12 +68,8 @@ def test_list_directory_recursive_dot_resolves_correctly(fs, mock_edit_simulator
     fs.create_file("/app/.teddyignore", contents="secret.txt")
     fs.create_file("/app/secret.txt", contents="shhh")
 
-    adapter = LocalFileSystemAdapter(
-        edit_simulator=mock_edit_simulator, root_dir="/app"
-    )
-
     # Act
-    files = adapter.list_directory_recursive(".")
+    files = build_adapter().list_directory_recursive(".")
 
     # Assert
     assert "src/app.log" not in files
