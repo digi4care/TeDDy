@@ -18,10 +18,10 @@ if TYPE_CHECKING:
 
 
 ALLOWED_RATIONALE_SECTIONS = [
-    "Synthesis",
-    "Justification",
+    "Summary",
     "Expectation",
-    "State Dashboard",
+    "Progress",
+    "Notes",
 ]
 
 # Tree Node Identifiers
