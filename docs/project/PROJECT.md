@@ -119,6 +119,11 @@ These files live in `docs/templates/` and are created or refreshed by `teddy ini
     - **Fix Pre-existing Exhaustive-Tier EDIT Latency:** The Tier 4 exhaustive matcher fallback runs a full difflib ratio per seeded window, costing 462–1827 ms on 400–1600-line files. Independent of slice 00-16's ambiguity work; scheduled as item 26 in the milestone document.
     - **Fix Pre-existing Preflight Acceptance Flake:** `test_handle_new_session_halts_on_preflight_failure_before_prompt` failed once across ~2201 tests and is green on every re-run. Scheduled as item 25 in the milestone document.
 
+### Milestone 7: Per-Persona Model Routing [PLANNED]
+- **Core Goal:** Enable per-persona LLM model and API key routing via `.teddy/config.yaml`.
+- **Spec:** [docs/project/specs/per-persona-model-routing.md](/docs/project/specs/per-persona-model-routing.md)
+- **Milestone:** [docs/project/milestones/07-per-persona-model-routing.md](/docs/project/milestones/07-per-persona-model-routing.md)
+
 ### Milestone 6: Cross-Cutting Consolidation [PLANNED]
 - **Core Goal:** Eliminate duplicated literals, helpers, and test doubles that must be kept in manual lockstep; consolidate split test organization; and perform a bounded Failure-Transparency sweep. Every item was formerly parked in the retired `## Technical Debt` section and is now scheduled as an explicit requirement in `docs/project/milestones/06-cross-cutting-consolidation.md`.
 - **Specs:** TBD
